@@ -1,0 +1,4 @@
+# Preserve source and artifact bytes across platforms.
+* -text
+# Markdown line breaks may use trailing spaces.
+*.md whitespace=-blank-at-eol

@@ -1,0 +1,31 @@
+# Dependencies and generated caches
+node_modules/
+.next/
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.tsbuildinfo
+.pytest_cache/
+.ipynb_checkpoints/
+dist/
+build/
+.DS_Store
+# Private local settings and runtime data
+.env
+.env.*
+!.env.example
+!.env.local.example
+*.pem
+*.key
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.log
+*.zip
+.idea/
+.vscode/
+next-env.d.ts
+/private/
