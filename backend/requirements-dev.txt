@@ -1,0 +1,5 @@
+-r requirements.txt
+# Tool-only changes: advisory fixes verified during foundation setup.
+pip==26.2.1
+pytest==9.0.3
+pip-audit==2.10.0

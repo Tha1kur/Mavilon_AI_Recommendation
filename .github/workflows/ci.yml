@@ -1,0 +1,203 @@
+name: Engineering checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - run: npm ci --no-audit
+      - run: python3 scripts/check.py frontend
+
+  backend:
+    # Match the observed Apple Silicon resolution. This is not a Linux/CUDA lock.
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+            backend/constraints/macos-arm64-py312.txt
+      - name: Install the scoped resolution
+        run: |
+          test "$(uname -m)" = arm64
+          python3 -m venv backend/.venv
+          backend/.venv/bin/python -m pip install pip==26.2.1
+          backend/.venv/bin/python -m pip install --only-binary=:all: -r backend/requirements-dev.txt -c backend/constraints/macos-arm64-py312.txt
+          backend/.venv/bin/python -m pip check
+      - run: python3 scripts/check.py backend-foundation
+
+  known-application-defects:
+    name: Known application defects
+    # Approved temporary exception for unchanged regressions APP-01 and APP-02.
+    # Runs independently of blocking jobs; pytest failure output is not suppressed.
+    # Remediation must restore `backend` above and remove this job/partition.
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+            backend/constraints/macos-arm64-py312.txt
+      - name: Install the scoped resolution
+        run: |
+          test "$(uname -m)" = arm64
+          python3 -m venv backend/.venv
+          backend/.venv/bin/python -m pip install pip==26.2.1
+          backend/.venv/bin/python -m pip install --only-binary=:all: -r backend/requirements-dev.txt -c backend/constraints/macos-arm64-py312.txt
+          backend/.venv/bin/python -m pip check
+      - name: Execute APP-01 and APP-02 regressions without suppression
+        id: regressions
+        continue-on-error: true
+        run: python3 scripts/check.py known-application-defects
+
+      - name: Report Known application defects
+        if: ${{ !cancelled() }}
+        env:
+          CHECK_OUTCOME: ${{ steps.regressions.outcome }}
+        run: |
+          {
+            printf '%s\n' '### Known application defects'
+            printf 'Execution outcome: **%s**\n\n' "$CHECK_OUTCOME"
+            printf '%s\n' 'Temporary exception: ROADMAP APP-01 and APP-02 must return these unchanged tests to the blocking backend suite in their remediation PR.'
+            printf '%s\n' 'Full diagnostic output is in the execution step above. A failure can also mean a tool/service error; it is not a clean result. A skipped step means no evidence was collected.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  safeguards:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - run: python3 scripts/install-gitleaks.py
+      - run: python3 scripts/check.py static
+      - run: python3 scripts/check.py gates
+      - name: Scan history and current source
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check.py secrets
+
+  dependency-advisories-npm:
+    name: Dependency advisories (npm)
+    # Temporary execution-step exception only: ROADMAP DEP-01.
+    # Setup/install failures remain failures; no dependency fixes or ignored advisories.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - run: npm ci --no-audit
+      - name: Execute npm audit with complete findings
+        id: audit
+        continue-on-error: true
+        run: python3 scripts/check.py audit-npm
+      - name: Report Dependency advisories (npm)
+        if: ${{ !cancelled() }}
+        env:
+          CHECK_OUTCOME: ${{ steps.audit.outcome }}
+        run: |
+          {
+            printf '%s\n' '### Dependency advisories (npm)'
+            printf 'Execution outcome: **%s**\n\n' "$CHECK_OUTCOME"
+            printf '%s\n' 'Temporary exception: ROADMAP DEP-01 tracks dependency remediation and restoration of blocking audits. Public release remains blocked by unresolved applicable high/critical findings.'
+            printf '%s\n' 'Full diagnostic output is in the execution step above. A failure can also mean a tool/service error; it is not a clean result. A skipped step means no evidence was collected.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  dependency-advisories-python:
+    name: Dependency advisories (python)
+    # Temporary execution-step exception only: ROADMAP DEP-01.
+    # Setup/install failures remain failures; no dependency fixes or ignored advisories.
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+            backend/constraints/macos-arm64-py312.txt
+      - name: Install the scoped resolution
+        run: |
+          test "$(uname -m)" = arm64
+          python3 -m venv backend/.venv
+          backend/.venv/bin/python -m pip install pip==26.2.1
+          backend/.venv/bin/python -m pip install --only-binary=:all: -r backend/requirements-dev.txt -c backend/constraints/macos-arm64-py312.txt
+          backend/.venv/bin/python -m pip check
+      - name: Execute python audit with complete findings
+        id: audit
+        continue-on-error: true
+        run: python3 scripts/check.py audit-python
+      - name: Report Dependency advisories (python)
+        if: ${{ !cancelled() }}
+        env:
+          CHECK_OUTCOME: ${{ steps.audit.outcome }}
+        run: |
+          {
+            printf '%s\n' '### Dependency advisories (python)'
+            printf 'Execution outcome: **%s**\n\n' "$CHECK_OUTCOME"
+            printf '%s\n' 'Temporary exception: ROADMAP DEP-01 tracks dependency remediation and restoration of blocking audits. Public release remains blocked by unresolved applicable high/critical findings.'
+            printf '%s\n' 'Full diagnostic output is in the execution step above. A failure can also mean a tool/service error; it is not a clean result. A skipped step means no evidence was collected.'
+          } >> "$GITHUB_STEP_SUMMARY"
