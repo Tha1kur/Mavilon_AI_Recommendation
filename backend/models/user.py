@@ -89,8 +89,8 @@ class TasteProfile(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False)
     taste_embedding = Column(JSON, nullable=True)  # Stored as JSON array
-    favorite_genres = Column(JSON, nullable=True)  # List of genres
-    favorite_moods = Column(JSON, nullable=True)  # List of moods
+    favorite_genres = Column(JSON, nullable=True)  # Genre -> decayed frequency score
+    favorite_moods = Column(JSON, nullable=True)  # Mood -> decayed frequency score
     interaction_count = Column(Integer, default=0)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

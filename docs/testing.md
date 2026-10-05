@@ -4,7 +4,7 @@
 
 The foundation should make installation and checks repeatable and make existing failures visible. It does not prove public-launch readiness, live-provider availability, recommendation quality or complete user-journey correctness. Use [README.md](../README.md) for canonical commands and [ROADMAP.md](../ROADMAP.md) for remediation order.
 
-The accepted operating stage is private development. Keep package versions and application behavior unchanged in this phase. When a baseline fails, retain the diagnostic and identify its owner/scope instead of suppressing it or adjusting behavior to obtain green results.
+The accepted operating stage is private development. The foundation preserved package versions and application behavior. The current authorized remediation changes only APP-01/APP-02 contracts; package versions remain unchanged. When a baseline fails, retain the diagnostic and identify its owner/scope instead of suppressing it or adjusting behavior to obtain green results.
 
 ## Deterministic backend coverage
 
@@ -67,16 +67,16 @@ Executed on **2026-10-05**, macOS **27.0.1 arm64**, Node **22.22.0**, npm **10.9
 
 The socket guard is installed before test collection and rejects connection, DNS and datagram-send attempts. It is an in-process Python safeguard, not an OS sandbox for arbitrary subprocesses/native extensions. Tests import the actual users route with a patched external model constructor and an overridden in-memory database. The small test-only `/request` endpoint exercises the production request model through FastAPI, not the full recommendation route.
 
-The full local gate remains nonzero because of the two application regressions. Current CI separates deterministic gates from temporarily informational dependency/application debt as described below. Remote protections have **not been modified**. The first hosted macOS 15 arm64 install/consistency/foundation tests passed. Linux/Windows/CUDA backend behavior, live TMDB, browser journeys, accessibility, performance capacity, recommendation quality and backup restoration are not certified.
+At the foundation checkpoint, the full local gate remained nonzero because of the two application regressions. Foundation CI separated deterministic gates from temporarily informational dependency/application debt as described below. Remote protections have **not been modified**. The first hosted macOS 15 arm64 install/consistency/foundation tests passed. Linux/Windows/CUDA backend behavior, live TMDB, browser journeys, accessibility, performance capacity, recommendation quality and backup restoration are not certified.
 
 ## Release evidence still required
 
-After approved remediation: verify identity/privacy controls, returning-session and populated-profile contracts, truthful optimistic-write recovery, history semantics, fallback/similar behavior, bounded resource use and safe errors. Then establish the target environment, full startup/model provenance, provider failure behavior, backup/restore and migration rollback. Review hosted required checks separately once CI has run successfully. See [security.md](security.md) for the release conditions.
+After core-contract remediation: verify broader identity/privacy controls, browser journeys, truthful optimistic-write recovery, history semantics, fallback/similar behavior, bounded resource use and safe errors. Then establish the target environment, full startup/model provenance, provider failure behavior, backup/restore and migration rollback. Review hosted required checks separately once CI has run successfully. See [security.md](security.md) for the release conditions.
 
 
-## Temporary CI regression partition
+## Temporary CI regression partition (historical; removed)
 
-Owner-approved after the foundation checkpoint, 2026-10-05. The two tests are byte-for-byte unchanged and still execute. The blocking backend partition deselects only their exact node IDs because the separate `Known application defects` job runs both. It has no dependency on the other jobs, so their failures do not prevent it from starting. The regression execution step uses `continue-on-error: true`; pytest returns its real exit code and displays complete failures. A following summary reports `steps.regressions.outcome` (the outcome before the exception), so failure is not relabeled as a clean test result. Setup/install steps have no exception. This follows [GitHub step-level failure handling](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepscontinue-on-error) and [step outcome semantics](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#steps-context).
+Removed by the APP-01/APP-02 remediation below. This section preserves historical policy and verification evidence. Owner-approved after the foundation checkpoint, 2026-10-05. The two tests are byte-for-byte unchanged and still execute. The blocking backend partition deselects only their exact node IDs because the separate `Known application defects` job runs both. It has no dependency on the other jobs, so their failures do not prevent it from starting. The regression execution step uses `continue-on-error: true`; pytest returns its real exit code and displays complete failures. A following summary reports `steps.regressions.outcome` (the outcome before the exception), so failure is not relabeled as a clean test result. Setup/install steps have no exception. This follows [GitHub step-level failure handling](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepscontinue-on-error) and [step outcome semantics](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#steps-context).
 
 | Job ID / displayed check | Scope | Policy |
 | --- | --- | --- |
@@ -92,7 +92,7 @@ Node IDs:
 - `backend/tests/test_users_contract.py::test_returning_session_matches_actual_frontend_request` — ROADMAP APP-01.
 - `backend/tests/test_users_contract.py::test_populated_profile_matches_persisted_and_frontend_shape` — ROADMAP APP-02.
 
-No test is skipped, marked xfail, deleted, weakened, or altered. `backend` and `all` retain their complete local scope. Removal is mandatory with the next APP-01/APP-02 remediation: restore blocking `backend`, remove the temporary job/partition/guard, and verify all tests pass. See [ROADMAP removal checklist](../ROADMAP.md#remove-the-temporary-ci-exception-with-app-01--app-02). The separate audit execution steps have owner-approved temporary exceptions tracked by ROADMAP DEP-01; audit commands still return nonzero, complete findings remain visible, and setup failures still fail. No ignored advisories or automatic dependency changes are used. Public release remains blocked by unresolved applicable high/critical findings. Summaries distinguish failure, success and skipped execution; a failed service lookup is unknown security status. This config does not modify hosted branch-protection settings.
+No test is skipped, marked xfail, deleted, weakened, or altered. `backend` and `all` retain their complete local scope. Removal is mandatory with the next APP-01/APP-02 remediation: restore blocking `backend`, remove the temporary job/partition/guard, and verify all tests pass. See [ROADMAP removal checklist](../ROADMAP.md#remediation-execution-status). The separate audit execution steps have owner-approved temporary exceptions tracked by ROADMAP DEP-01; audit commands still return nonzero, complete findings remain visible, and setup failures still fail. No ignored advisories or automatic dependency changes are used. Public release remains blocked by unresolved applicable high/critical findings. Summaries distinguish failure, success and skipped execution; a failed service lookup is unknown security status. This config does not modify hosted branch-protection settings.
 
 
 Partition verification before the local foundation commit: `backend-foundation` passed **15 tests**, deselecting exactly the two regressions which `known-application-defects` executed and reported as **2 failures** (exit 1, full output). The regression file SHA256 was unchanged before/after the CI refinement. **10 safeguard tests passed**, including the exact partition/failure-propagation guard. Workflow YAML/policy validation verified four independent jobs, only the named job-level exception, and no step-level exception. Static checks and `git diff --check` passed. That partition was subsequently exercised in the first hosted run below.
@@ -114,3 +114,30 @@ Official latest stable releases and immutable tag commit targets were verified t
 
 
 Local refinement verification (2026-10-05): YAML parsing/policy assertions passed for all six jobs, main-only push events, immutable verified action pins, three exact step-level exceptions, no job-level exceptions, and unchanged blocking commands. Every inline shell script passed `bash -n`; the three summary scripts were executed with failure/success/skipped fixtures and preserved each original outcome. `static` passed, all **10 safeguard tests passed**, and Gitleaks history/source scans found no leaks. `npm ci --no-audit` installed 432 packages; lint/typecheck/production build all passed. Existing deprecation warnings remain. Python `pip check` passed; **15 foundation tests passed** and both unchanged APP-01/APP-02 regressions failed with full output and exit 1. Both canonical audits ran without output suppression and returned exit 1: npm reported **25 affected package records (1 critical, 18 high, 5 moderate, 1 low)**; Python reported **28 finding records across 6 packages**. No backend reinstall was needed for this workflow-only change; the existing scoped environment and first hosted install evidence were used. Application source, tests, manifests, lockfile, constraints and runtime declarations were verified unchanged. `git diff --check` passed. This local validation does not substitute for execution of the revised workflow on GitHub.
+
+
+## Core contract remediation APP-01 / APP-02
+
+2026-10-05, `fix/core-contracts`, uncommitted work based on merged foundation. Scope: [contract decisions](requirements.md#app-01--app-02-contract-decisions). No live TMDB/model downloads, developer database, or real credentials used. No browser behavior is claimed.
+
+Before edits, `backend/.venv/bin/python -m pytest -c backend/pytest.ini backend/tests/test_users_contract.py` reproduced **2 failures, 1 pass**: APP-01 returned another session ID; APP-02 returned HTTP 500. The original three test functions remain unchanged. Additional cases cover JSON creation, repeated returning identity/data preservation, unknown/malformed sessions, rejected query transport, legacy identities, empty/missing and legacy profiles, fractional score/count preservation, and sanitized failures. Frontend Node tests execute the real TypeScript API wrapper with isolated HTTP/storage boundaries, including concurrency and transient-failure identity preservation.
+
+Current CI has five independent jobs. Frontend contract tests/lint/type/build, **all** backend tests, and safeguards block on failure. The `Known application defects` job and temporary partition commands/constant/guard are removed. Both dependency-advisory jobs and their existing execution-step exceptions are unchanged. Historical hosted evidence above does not verify this unpushed workflow.
+
+Final verification on Python 3.12.7/macOS arm64, Node 22.22.0/npm 10.9.4:
+
+| Check | Result |
+| --- | --- |
+| Focused exact APP-01 and APP-02 node IDs, run independently | **2 passed**; no skips/xfails or changed assertions |
+| `python3 scripts/check.py backend` | **37 passed** (including 23 session/profile contract cases); existing 69 deprecation warnings retained |
+| `npm run test:contracts` | **12 passed**, including interceptor validation-log redaction; no external services |
+| Frontend lint / typecheck / production build via `python3 scripts/check.py frontend` | **PASS**; Next generated all five static pages. Existing Next lint deprecation and stale Browserslist warnings retained. The later added interceptor test was separately run with all 12 frontend contract tests; no application source changed after the build. |
+| `python3 scripts/check.py gates` | **9 passed**; only the obsolete partition guard was removed |
+| `python3 scripts/check.py static` | **PASS** |
+| `python3 scripts/check.py secrets` | **PASS**, pinned Gitleaks scanned four commits and nonignored current source; no leaks |
+| CI/configuration review | **PASS**: YAML parses; five jobs; complete backend command with no deterministic failure exceptions; inline shell syntax valid; both advisory jobs byte-identical to HEAD |
+| Scope preservation | Original regression file retained byte-for-byte as the prefix of the expanded file. Dependency lockfile, direct Python pins/dev requirements and constraints byte-identical to HEAD. No algorithm/service/persistence schema changes. |
+| `git diff --check` and changed-document local links | **PASS** |
+| Independent read-only security review | No introduced blocker for APP-01/APP-02; [findings and residual risks](security.md#app-01--app-02-scoped-security-review) |
+
+APP-01/APP-02 are ready for normal blocking coverage. No browser/rendered UI journey, live TMDB/model, cross-tab race, deployment, or hosted run of this revised workflow was verified. Dependency advisories were neither changed nor re-audited; their existing temporary policy remains. The owner approved this checkpoint and authorized commit/push, PR creation, hosted CI, and then scoped BrowserAct QA if CI is green; merging is not authorized.

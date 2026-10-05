@@ -4,45 +4,47 @@
  */
 
 import apiClient from './client';
+import { isAxiosError } from 'axios';
+import { SessionResponse, TasteProfile } from '@/types/user';
 
 const SESSION_STORAGE_KEY = 'mavilon_session_id';
 
-/**
- * Get or create user session
- */
-export async function getOrCreateSession(): Promise<string> {
-    // Check localStorage for existing session
-    let sessionId = localStorage.getItem(SESSION_STORAGE_KEY);
+// Share concurrent initialization (the profile loads several resources at once).
+let sessionRequest: Promise<string> | null = null;
 
-    if (sessionId) {
-        // Verify session is still valid
+async function resolveSession(): Promise<string> {
+    const storedId = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (storedId) {
         try {
-            await apiClient.post('/api/users/session', { session_id: sessionId });
-            return sessionId;
+            const response = await apiClient.post<SessionResponse>('/api/users/session', { session_id: storedId });
+            localStorage.setItem(SESSION_STORAGE_KEY, response.data.session_id);
+            return response.data.session_id;
         } catch (error) {
-            // Session invalid, create new one
-            console.warn('Existing session invalid, creating new one');
+            // Only a definitive invalid/unknown identity permits replacement.
+            // Network/server failures must preserve the user's existing identity.
+            if (!isAxiosError(error) || ![404, 422].includes(error.response?.status ?? 0)) {
+                throw error;
+            }
             localStorage.removeItem(SESSION_STORAGE_KEY);
-            sessionId = null;
         }
     }
 
-    // Create new session
-    try {
-        const response = await apiClient.post<{ session_id: string; user_id: string; is_new: boolean }>('/api/users/session');
-        sessionId = response.data.session_id;
+    const response = await apiClient.post<SessionResponse>('/api/users/session');
+    localStorage.setItem(SESSION_STORAGE_KEY, response.data.session_id);
+    return response.data.session_id;
+}
 
-        // Store in localStorage
-        localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
-
-        return sessionId;
-    } catch (error) {
-        console.error('Failed to create session:', error);
-        // Generate fallback session ID
-        const fallbackId = `fallback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        localStorage.setItem(SESSION_STORAGE_KEY, fallbackId);
-        return fallbackId;
+/** Get a server-confirmed session; never persist a fabricated fallback ID. */
+export function getOrCreateSession(): Promise<string> {
+    if (!sessionRequest) {
+        sessionRequest = resolveSession()
+            .catch(() => {
+                // Axios errors contain request bodies; do not expose them to callers' logs.
+                throw new Error('Unable to establish session');
+            })
+            .finally(() => { sessionRequest = null; });
     }
+    return sessionRequest;
 }
 
 /**
@@ -79,18 +81,13 @@ export async function trackInteraction(
 /**
  * Get user taste profile
  */
-export async function getUserProfile(): Promise<{
-    favorite_genres?: Record<string, number>;
-    favorite_moods?: Record<string, number>;
-    interaction_count: number;
-}> {
+export async function getUserProfile(): Promise<TasteProfile> {
+    const sessionId = await getOrCreateSession();
     try {
-        const sessionId = await getOrCreateSession();
-        const response = await apiClient.get(`/api/users/${sessionId}/profile`);
+        const response = await apiClient.get<TasteProfile>(`/api/users/${sessionId}/profile`);
         return response.data;
-    } catch (error) {
-        console.error('Failed to get user profile:', error);
-        return { interaction_count: 0 };
+    } catch {
+        throw new Error('Unable to load taste profile');
     }
 }
 

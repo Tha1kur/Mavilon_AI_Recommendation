@@ -10,12 +10,6 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-# Temporary CI partition only. Remove on ROADMAP APP-01/APP-02 remediation.
-# The default backend/all commands always run the complete suite.
-KNOWN_APPLICATION_DEFECTS = (
-    "backend/tests/test_users_contract.py::test_returning_session_matches_actual_frontend_request",
-    "backend/tests/test_users_contract.py::test_populated_profile_matches_persisted_and_frontend_shape",
-)
 
 
 def private_path(name):
@@ -81,19 +75,10 @@ def static(root=ROOT):
 def check(name):
     if name == "static":
         return static()
-    if name in ("backend", "backend-foundation", "known-application-defects"):
-        command = [python(), "-m", "pytest", "-c", "backend/pytest.ini"]
-        if name == "known-application-defects":
-            print("Known application defects: ROADMAP APP-01 and APP-02; failures remain visible.", flush=True)
-            command.extend(KNOWN_APPLICATION_DEFECTS)
-        else:
-            command.append("backend/tests")
-            if name == "backend-foundation":
-                # pytest reports node IDs relative to its backend/ rootdir.
-                command.extend(f"--deselect={test.removeprefix('backend/')}" for test in KNOWN_APPLICATION_DEFECTS)
-        return run(command)
+    if name == "backend":
+        return run([python(), "-m", "pytest", "-c", "backend/pytest.ini", "backend/tests"])
     if name == "frontend":
-        results = [run(["npm", "run", task]) for task in ("lint", "typecheck", "build")]
+        results = [run(["npm", "run", task]) for task in ("test:contracts", "lint", "typecheck", "build")]
         return int(any(results))
     if name == "gates":
         return run([sys.executable, "-m", "unittest", "discover", "-s", "scripts/tests", "-v"])
@@ -128,8 +113,7 @@ def check(name):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("check", choices=["static", "backend", "backend-foundation",
-                                           "known-application-defects", "frontend", "gates", "all",
+    parser.add_argument("check", choices=["static", "backend", "frontend", "gates", "all",
                                            "audit-npm", "audit-python", "secrets"])
     args = parser.parse_args()
     try:

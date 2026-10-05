@@ -19,7 +19,7 @@ Frontend versions are resolved by `package-lock.json`; direct backend versions a
 
 ## Data flow and ownership
 
-1. The browser gets/stores `mavilon_session_id` in localStorage and sends it with user API calls. There is no separate authentication layer identified in the source.
+1. The browser gets/stores the server-confirmed `mavilon_session_id` in localStorage. Session lookup uses only a JSON body at `POST /api/users/session`; other existing user APIs still carry it in paths. A supplied ID must exist for session lookup, while other routes retain their existing get-or-create behavior. There is no separate authentication layer identified in the source.
 2. Discovery/search/detail routes fetch and normalize TMDB results. Both movie and anime IDs refer to TMDB; historical AniList/OMDb comments do not describe active integrations.
 3. Recommendation services combine content features, mood and stored taste. The default model name is `all-MiniLM-L6-v2`; package reproducibility does not pin downloaded model assets.
 4. User interactions update SQLite and attempt taste recalculation. Favorites and watch history are separate tables. Interactions do not automatically establish watched history.
@@ -31,7 +31,7 @@ Frontend versions are resolved by `package-lock.json`; direct backend versions a
 | `interactions` | User/content/type/event/mood and timestamp; no event deduplication constraint |
 | `favorites` | User/content/type and timestamp; unique `(user_id, content_id)` |
 | `watch_history` | Separate watched timestamp/completion record; normal frontend interaction flow does not write it |
-| `taste_profiles` | One per user; JSON embedding, genre/mood values, count and update time |
+| `taste_profiles` | One per user; JSON embedding, genre/mood score dictionaries, count and update time |
 
 Behavioral data and identity identifiers are private. SQLite is `sqlite:///./mavilon_users.db`, relative to process working directory. Start in `backend/`; tests must isolate their database. Startup calls `create_all` and ad hoc SQLite column migrations. Alembic is a dependency, but no versioned migration environment is established.
 
@@ -60,3 +60,7 @@ Evidence and scope: [testing.md](testing.md). Primary guidance: [pip repeatable 
 CI is repository-side verification, not deployment. No hosting target, production platform, GPU need, process count, migration policy, recovery objective, or operating owner is agreed. Before deployment: select the target; reproduce its dependency/model environment; establish backup and tested restore for SQLite; define a safe migration/rollback procedure; set configuration/secrets/logging boundaries; verify identity, error, correctness and resource controls. No production migration or provisioning is authorized by these notes.
 
 There is no evidence yet requiring Redis, a vector database, containers, Kubernetes, or additional services. Known defects and deferred decisions are in [ROADMAP.md](../ROADMAP.md), [requirements.md](requirements.md), and [security.md](security.md).
+
+## Core contract remediation boundary
+
+APP-01/APP-02 align existing HTTP and TypeScript contracts without a new identity system, database migration or recommendation algorithm. The session route checks existence before using the existing user service; it returns persisted IDs and updates last-active through that service. `TasteProfileResponse` normalizes null/legacy preferences at the response boundary and preserves scored dictionaries. `types/user.ts` is shared by the API wrapper and profile UI. See [canonical contract decisions](requirements.md#app-01--app-02-contract-decisions). Anonymous bearer-like ownership, other URL-bearing endpoints, cross-tab/new-session retry idempotency, and lifecycle controls remain separate work.

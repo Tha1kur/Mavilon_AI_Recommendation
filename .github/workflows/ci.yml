@@ -60,54 +60,7 @@ jobs:
           backend/.venv/bin/python -m pip install pip==26.2.1
           backend/.venv/bin/python -m pip install --only-binary=:all: -r backend/requirements-dev.txt -c backend/constraints/macos-arm64-py312.txt
           backend/.venv/bin/python -m pip check
-      - run: python3 scripts/check.py backend-foundation
-
-  known-application-defects:
-    name: Known application defects
-    # Approved temporary exception for unchanged regressions APP-01 and APP-02.
-    # Runs independently of blocking jobs; pytest failure output is not suppressed.
-    # Remediation must restore `backend` above and remove this job/partition.
-    runs-on: macos-15
-    timeout-minutes: 20
-    env:
-      HF_HUB_OFFLINE: '1'
-      TRANSFORMERS_OFFLINE: '1'
-      PYTHONDONTWRITEBYTECODE: '1'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version-file: .python-version
-          cache: pip
-          cache-dependency-path: |
-            backend/requirements.txt
-            backend/requirements-dev.txt
-            backend/constraints/macos-arm64-py312.txt
-      - name: Install the scoped resolution
-        run: |
-          test "$(uname -m)" = arm64
-          python3 -m venv backend/.venv
-          backend/.venv/bin/python -m pip install pip==26.2.1
-          backend/.venv/bin/python -m pip install --only-binary=:all: -r backend/requirements-dev.txt -c backend/constraints/macos-arm64-py312.txt
-          backend/.venv/bin/python -m pip check
-      - name: Execute APP-01 and APP-02 regressions without suppression
-        id: regressions
-        continue-on-error: true
-        run: python3 scripts/check.py known-application-defects
-
-      - name: Report Known application defects
-        if: ${{ !cancelled() }}
-        env:
-          CHECK_OUTCOME: ${{ steps.regressions.outcome }}
-        run: |
-          {
-            printf '%s\n' '### Known application defects'
-            printf 'Execution outcome: **%s**\n\n' "$CHECK_OUTCOME"
-            printf '%s\n' 'Temporary exception: ROADMAP APP-01 and APP-02 must return these unchanged tests to the blocking backend suite in their remediation PR.'
-            printf '%s\n' 'Full diagnostic output is in the execution step above. A failure can also mean a tool/service error; it is not a clean result. A skipped step means no evidence was collected.'
-          } >> "$GITHUB_STEP_SUMMARY"
+      - run: python3 scripts/check.py backend
 
   safeguards:
     runs-on: ubuntu-24.04

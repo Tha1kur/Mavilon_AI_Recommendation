@@ -52,7 +52,10 @@ apiClient.interceptors.response.use(
             }
         }
 
-        console.error('API Error:', error.response?.data || error.message);
+        // Session validation responses can contain submitted identity values.
+        console.error('API Error:', originalRequest?.url === '/api/users/session'
+            ? 'Session request failed'
+            : error.response?.data || error.message);
         throw error;
     }
 );

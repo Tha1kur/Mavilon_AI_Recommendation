@@ -3,16 +3,22 @@ User management API endpoints.
 Handles user sessions, profiles, and interaction tracking.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from typing import Optional, List
+from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
+from typing import Optional
 from database import get_db
 from services.user_service import user_service
-from models.user import InteractionType
+from models.user import InteractionType, User
 import uuid
 
 router = APIRouter()
+
+
+class SessionRequest(BaseModel):
+    """An omitted identity creates a session; supplied identities must exist."""
+    model_config = ConfigDict(extra="forbid")
+    session_id: Optional[StrictStr] = Field(default=None, min_length=1)
 
 
 class SessionResponse(BaseModel):
@@ -32,14 +38,25 @@ class InteractionRequest(BaseModel):
 
 class TasteProfileResponse(BaseModel):
     """User taste profile response."""
-    favorite_genres: Optional[List[str]] = None
-    favorite_moods: Optional[List[str]] = None
+    favorite_genres: dict[str, float] = Field(default_factory=dict)
+    favorite_moods: dict[str, float] = Field(default_factory=dict)
     interaction_count: int = 0
+
+    @field_validator("favorite_genres", "favorite_moods", mode="before")
+    @classmethod
+    def normalize_stored_scores(cls, value):
+        if value is None:
+            return {}
+        # Match the service's existing conversion of legacy unscored lists.
+        if isinstance(value, list):
+            return {label: 1.0 for label in value}
+        return value
 
 
 @router.post("/session", response_model=SessionResponse)
 async def create_or_get_session(
-    session_id: Optional[str] = None,
+    request: Request,
+    payload: Optional[SessionRequest] = None,
     db: Session = Depends(get_db)
 ):
     """
@@ -47,23 +64,31 @@ async def create_or_get_session(
     If session_id is provided, retrieve that session.
     Otherwise, create a new session.
     """
+    if request.query_params:
+        raise HTTPException(status_code=400, detail="Use a JSON body for session requests")
+    session_id = payload.session_id if payload else None
     try:
-        if not session_id:
+        if session_id is None:
             # Generate new session ID
             session_id = str(uuid.uuid4())
             is_new = True
         else:
             is_new = False
+            if not db.query(User).filter(User.session_id == session_id).first():
+                raise HTTPException(status_code=404, detail="Session not found")
         
         user = user_service.get_or_create_user(db, session_id)
         
         return SessionResponse(
-            session_id=session_id,
+            session_id=user.session_id,
             user_id=user.id,
             is_new=is_new
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create session: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to create session")
 
 
 @router.get("/{session_id}/profile", response_model=TasteProfileResponse)
@@ -84,8 +109,8 @@ async def get_user_profile(
             favorite_moods=taste_profile.favorite_moods,
             interaction_count=taste_profile.interaction_count
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get profile: {str(e)}")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to get profile")
 
 
 @router.post("/{session_id}/interact")
