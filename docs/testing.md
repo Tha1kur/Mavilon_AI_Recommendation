@@ -67,7 +67,7 @@ Executed on **2026-10-05**, macOS **27.0.1 arm64**, Node **22.22.0**, npm **10.9
 
 The socket guard is installed before test collection and rejects connection, DNS and datagram-send attempts. It is an in-process Python safeguard, not an OS sandbox for arbitrary subprocesses/native extensions. Tests import the actual users route with a patched external model constructor and an overridden in-memory database. The small test-only `/request` endpoint exercises the production request model through FastAPI, not the full recommendation route.
 
-The full local gate remains nonzero because of the two application regressions. The approved CI partition below makes only their separate job non-blocking; advisory steps and all foundation jobs remain blocking. GitHub CI has **not run** and remote protections have **not been modified**. The backend job targets macOS 15 arm64 based on official runner documentation, but its hosted result and account availability remain unverified. Linux/Windows/CUDA backend behavior, live TMDB, browser journeys, accessibility, performance capacity, recommendation quality and backup restoration are not certified.
+The full local gate remains nonzero because of the two application regressions. Current CI separates deterministic gates from temporarily informational dependency/application debt as described below. Remote protections have **not been modified**. The first hosted macOS 15 arm64 install/consistency/foundation tests passed. Linux/Windows/CUDA backend behavior, live TMDB, browser journeys, accessibility, performance capacity, recommendation quality and backup restoration are not certified.
 
 ## Release evidence still required
 
@@ -76,21 +76,41 @@ After approved remediation: verify identity/privacy controls, returning-session 
 
 ## Temporary CI regression partition
 
-Owner-approved after the foundation checkpoint, 2026-10-05. The two tests are byte-for-byte unchanged and still execute. The blocking backend partition deselects only their exact node IDs because the separate `Known application defects` job runs both. It has no dependency on the other jobs, so their failures do not prevent it from starting. Job-level `continue-on-error: true` is the only exception; the pytest step returns its real exit code and displays complete failures. This follows [GitHub job-level failure handling](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idcontinue-on-error).
+Owner-approved after the foundation checkpoint, 2026-10-05. The two tests are byte-for-byte unchanged and still execute. The blocking backend partition deselects only their exact node IDs because the separate `Known application defects` job runs both. It has no dependency on the other jobs, so their failures do not prevent it from starting. The regression execution step uses `continue-on-error: true`; pytest returns its real exit code and displays complete failures. A following summary reports `steps.regressions.outcome` (the outcome before the exception), so failure is not relabeled as a clean test result. Setup/install steps have no exception. This follows [GitHub step-level failure handling](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepscontinue-on-error) and [step outcome semantics](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#steps-context).
 
 | Job ID / displayed check | Scope | Policy |
 | --- | --- | --- |
-| `frontend` | npm install, lint/type/build, npm audit | Blocking |
-| `backend` | scoped Python install/consistency, `backend-foundation`, pip-audit | Blocking |
+| `frontend` | `npm ci --no-audit`, lint/type/build | Blocking |
+| `backend` | scoped Python install/consistency, `backend-foundation` | Blocking |
 | `safeguards` | pinned scanner installation, static/private-path checks, gate tests, history/current-source secret scan | Blocking |
-| `known-application-defects` / **Known application defects** | same backend environment, exact APP-01/APP-02 regressions | Temporarily non-blocking |
+| `known-application-defects` / **Known application defects** | same backend environment, exact APP-01/APP-02 regressions | Regression step temporarily non-blocking |
+| `dependency-advisories-npm` / **Dependency advisories (npm)** | clean npm install, full canonical npm audit, outcome summary | Audit step temporarily non-blocking |
+| `dependency-advisories-python` / **Dependency advisories (python)** | scoped Python install/consistency, full installed-environment pip-audit, outcome summary | Audit step temporarily non-blocking |
 
 Node IDs:
 
 - `backend/tests/test_users_contract.py::test_returning_session_matches_actual_frontend_request` — ROADMAP APP-01.
 - `backend/tests/test_users_contract.py::test_populated_profile_matches_persisted_and_frontend_shape` — ROADMAP APP-02.
 
-No test is skipped, marked xfail, deleted, weakened, or altered. `backend` and `all` retain their complete local scope. Removal is mandatory with the next APP-01/APP-02 remediation: restore blocking `backend`, remove the temporary job/partition/guard, and verify all tests pass. See [ROADMAP removal checklist](../ROADMAP.md#remove-the-temporary-ci-exception-with-app-01--app-02). Dependency advisories remain blocking and can still prevent a green workflow. This config does not modify hosted branch-protection settings.
+No test is skipped, marked xfail, deleted, weakened, or altered. `backend` and `all` retain their complete local scope. Removal is mandatory with the next APP-01/APP-02 remediation: restore blocking `backend`, remove the temporary job/partition/guard, and verify all tests pass. See [ROADMAP removal checklist](../ROADMAP.md#remove-the-temporary-ci-exception-with-app-01--app-02). The separate audit execution steps have owner-approved temporary exceptions tracked by ROADMAP DEP-01; audit commands still return nonzero, complete findings remain visible, and setup failures still fail. No ignored advisories or automatic dependency changes are used. Public release remains blocked by unresolved applicable high/critical findings. Summaries distinguish failure, success and skipped execution; a failed service lookup is unknown security status. This config does not modify hosted branch-protection settings.
 
 
-Partition verification before the local foundation commit: `backend-foundation` passed **15 tests**, deselecting exactly the two regressions which `known-application-defects` executed and reported as **2 failures** (exit 1, full output). The regression file SHA256 was unchanged before/after the CI refinement. **10 safeguard tests passed**, including the exact partition/failure-propagation guard. Workflow YAML/policy validation verified four independent jobs, only the named job-level exception, and no step-level exception. Static checks and `git diff --check` passed. Hosted execution remains unverified.
+Partition verification before the local foundation commit: `backend-foundation` passed **15 tests**, deselecting exactly the two regressions which `known-application-defects` executed and reported as **2 failures** (exit 1, full output). The regression file SHA256 was unchanged before/after the CI refinement. **10 safeguard tests passed**, including the exact partition/failure-propagation guard. Workflow YAML/policy validation verified four independent jobs, only the named job-level exception, and no step-level exception. Static checks and `git diff --check` passed. That partition was subsequently exercised in the first hosted run below.
+
+
+## Hosted evidence and CI refinement
+
+The [first PR run](https://github.com/Tha1kur/Mavilon_AI_Recommendation/actions/runs/37296409259) and [duplicate feature push run](https://github.com/Tha1kur/Mavilon_AI_Recommendation/actions/runs/37296372423) ran the foundation commit. GitHub job/step results confirm frontend install/lint/type/build passed, backend install/consistency/foundation tests passed, safeguards passed, and only the audit steps failed the frontend/backend jobs. APP-01/APP-02 failed as expected. The owner reported Node 20 action-runtime deprecation warnings.
+
+The refinement runs on `pull_request`, `push` restricted to `main`, and `workflow_dispatch`. Ordinary feature pushes no longer trigger both push and PR workflows. Six independent jobs preserve full diagnostic output. Only the two audit execution steps and exact known-regression execution step tolerate failure; job-level exceptions are absent. Summaries run after execution (unless cancelled), including when setup failed, and report the original outcome. There is no dependency on another job's success.
+
+Official latest stable releases and immutable tag commit targets were verified through GitHub's release/ref APIs and each commit's `action.yml`; all declare `node24`. The selected releases require runner v2.327.1 or newer; this workflow uses GitHub-hosted runners. Existing inputs remain supported; checkout's new unsafe-trigger restriction does not affect the `pull_request` trigger, persisted credentials remain disabled, and explicit npm caching is retained. The application's Node 22.22.0/Python 3.12.7 and all dependency manifests/constraints remain unchanged.
+
+| Action | Previous | Selected stable release | Verified commit SHA |
+| --- | --- | --- | --- |
+| checkout | v4.2.2 | [v7.0.1](https://github.com/actions/checkout/releases/tag/v7.0.1) | `3d3c42e5aac5ba805825da76410c181273ba90b1` |
+| setup-node | v4.4.0 | [v7.0.0](https://github.com/actions/setup-node/releases/tag/v7.0.0) | `820762786026740c76f36085b0efc47a31fe5020` |
+| setup-python | v5.6.0 | [v7.0.0](https://github.com/actions/setup-python/releases/tag/v7.0.0) | `5fda3b95a4ea91299a34e894583c3862153e4b97` |
+
+
+Local refinement verification (2026-10-05): YAML parsing/policy assertions passed for all six jobs, main-only push events, immutable verified action pins, three exact step-level exceptions, no job-level exceptions, and unchanged blocking commands. Every inline shell script passed `bash -n`; the three summary scripts were executed with failure/success/skipped fixtures and preserved each original outcome. `static` passed, all **10 safeguard tests passed**, and Gitleaks history/source scans found no leaks. `npm ci --no-audit` installed 432 packages; lint/typecheck/production build all passed. Existing deprecation warnings remain. Python `pip check` passed; **15 foundation tests passed** and both unchanged APP-01/APP-02 regressions failed with full output and exit 1. Both canonical audits ran without output suppression and returned exit 1: npm reported **25 affected package records (1 critical, 18 high, 5 moderate, 1 low)**; Python reported **28 finding records across 6 packages**. No backend reinstall was needed for this workflow-only change; the existing scoped environment and first hosted install evidence were used. Application source, tests, manifests, lockfile, constraints and runtime declarations were verified unchanged. `git diff --check` passed. This local validation does not substitute for execution of the revised workflow on GitHub.

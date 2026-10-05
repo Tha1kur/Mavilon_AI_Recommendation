@@ -10,7 +10,7 @@ Private development toward a later public launch. The owner approved foundation 
 | B | Establish concise local guidance, requirements, actual architecture, testing/security context; reconcile stale provider documentation | Complete: canonical documentation integrated |
 | C | Declare tested runtimes and the smallest evidence-backed dependency strategy, accounting for platform-sensitive ML packages | Complete for Python 3.12/macOS arm64; other backend platforms deliberately unverified |
 | D | Canonical checks and focused deterministic backend tests | Complete: canonical checks; 15 tests pass and 2 expose existing defects |
-| E | Fast native hook, pinned Gitleaks, npm/pip audits and repository-side GitHub Actions | Complete locally; safeguard tests pass, audits report findings, hosted CI not run |
+| E | Fast native hook, pinned Gitleaks, npm/pip audits and repository-side GitHub Actions | Hosted deterministic checks pass; audits and known defects report existing debt; see testing evidence |
 | F | Run applicable checks, test safeguard failure modes, distinguish existing failures/security findings from foundation regressions | Complete with documented failures/blockers; see testing evidence |
 | G | Review complete diff for behavior preservation, useful docs, private/generated files and unresolved blockers | Complete: source/config preservation, dependency graph, audit hashes, docs links and safeguards reviewed; awaiting separate remediation approval |
 
@@ -30,11 +30,17 @@ Define identity/history requirements before their affected implementation. These
 
 ### Remove the temporary CI exception with APP-01 / APP-02
 
-The owner approved a foundation-only CI exception for exactly the two existing regressions. `Known application defects` runs them on every workflow event independently of the blocking jobs, with job-level `continue-on-error: true` and normal failure output. This is not a release waiver. All foundation checks and dependency audits remain blocking.
+The owner approved a foundation-only CI exception for exactly the two existing regressions. `Known application defects` runs them on every workflow event independently of the blocking jobs, with execution-step `continue-on-error: true`, normal failure output and a summary of the original step outcome. Setup failures remain failures. This is not a release waiver. All deterministic foundation checks remain blocking; dependency audits have their separate DEP-01 exception below.
 
 The next remediation PR must fix APP-01/APP-02 without weakening these tests, demonstrate both pass, switch the blocking backend job from `backend-foundation` back to `backend`, and remove the temporary job plus `KNOWN_APPLICATION_DEFECTS`/partition commands and their guard test. If fixes land separately, return each fixed test to blocking coverage in that same PR; do not leave a fixed test under the exception. Default local `backend`/`all` already include both tests. Document the removal and rerun the complete blocking suite. The exception cannot expand to additional tests without explicit approval.
 
 Split this scope into reviewable changes if fixing all contracts together obscures behavior review. The session/profile regressions already fail in the foundation suite. Extend regression tests with each approved fix; do not change expectations solely to achieve green checks.
+
+## DEP-01 — Dependency remediation and removal of advisory exceptions
+
+The owner approved temporary step-level exceptions for the dedicated **Dependency advisories (npm)** and **Dependency advisories (python)** jobs during private foundation development. Both execute the unchanged canonical audit commands, show all findings, and summarize the execution outcome. No automatic fix, ignored advisory, or blanket acceptance of risk is authorized. Audit service/tool failures are unknown results requiring investigation, not successful security evidence.
+
+A separate dependency-remediation change must triage the [recorded findings](docs/security.md#dependency-audit-triage), establish applicability, make minimum compatible fixes with regression verification, and rerun both audits. Remove each audit step's `continue-on-error` and temporary-exception documentation when its debt is resolved; keep the dedicated checks blocking thereafter. This exception ends before public release: unresolved applicable high/critical findings block launch. Any proposed per-advisory exception requires explicit review with applicability evidence, owner and expiry; this CI exception grants none.
 
 ## Before public exposure
 
