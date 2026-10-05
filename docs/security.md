@@ -26,7 +26,7 @@ This is a source-grounded foundation assessment, not a penetration test or legal
 | SEC-05 | Release prerequisite: [data model](../backend/models/user.py), startup migrations in [database](../backend/database.py) | Retention/deletion, backup/restore, operational access, migration ownership and recovery targets are undefined. Agree policy, implement it and verify restore/deletion before holding public-user data. |
 | SEC-06 | Deployment prerequisite: [CORS and health](../backend/main.py), [configuration](../backend/config.py) | Hardcoded localhost CORS and optimistic health status are not production configuration/readiness controls. Choose hosting and enforce/test the intended origins and readiness behavior in the release/remediation phase. |
 
-Application correctness findings are tracked alongside these risks in [ROADMAP.md](../ROADMAP.md). Two existing contract failures are explicitly exposed by the foundation tests.
+Application correctness findings are tracked alongside these risks in [ROADMAP.md](../ROADMAP.md). The foundation tests exposed APP-01/APP-02; their scoped remediation is recorded below. Broader security findings remain open.
 
 ## Foundation safeguards and operating rules
 
@@ -52,3 +52,15 @@ Snapshot: [dependency-audit.json](dependency-audit.json), 2026-10-05. Findings a
 Canonical npm audit fails on high/critical severity (`--audit-level=high`); lower findings remain visible. pip-audit fails on any finding. The owner approved temporary CI execution-step exceptions under ROADMAP DEP-01, not acceptance of any individual vulnerability. Full findings and original outcomes remain visible in dedicated advisory jobs; setup failures still fail. Public release remains blocked by unresolved applicable high/critical findings. Before public launch, review exploit prerequisites and minimum compatible fixes, add focused regressions, and run a fresh audit. Any future exception requires a specific advisory, applicability evidence, responsible owner and review/expiry condition; it must not conceal a failed advisory-service request.
 
 The Gitleaks binary is pinned to 8.30.0 with platform archive hashes in `scripts/gitleaks.json`, obtained from upstream release metadata. Updating it requires reviewing upstream provenance, changing version/hashes together, reinstalling outside the hook, and rerunning scanner/hook tests. Official references: [Gitleaks release](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.0), [pip-audit](https://github.com/pypa/pip-audit), [pytest advisory](https://github.com/advisories/GHSA-6w46-j5rx-g56g). Action pins similarly require upstream SHA verification and workflow review; no automatic merging is configured.
+
+
+## APP-01 / APP-02 scoped security review
+
+2026-10-05: independent read-only `security_reviewer` reviewed the implemented diff, session/profile routes, service ownership, localStorage, Axios behavior, request logging and contract tests. No introduced security finding blocks these contracts from becoming blocking tests. This is not public-release approval or a full authentication review.
+
+- Body-only session lookup rejects query transport and unknown IDs without creating users. Existing persisted IDs are authoritative. Malformed bodies return validation errors without persistence; session request errors are sanitized before browser logging, and session/profile server errors omit raw exception details. Default FastAPI validation responses can echo submitted invalid input to the requester; they must not be logged as credentials by middleware/proxies.
+- **SEC-01, verified source issue, Medium severity/high confidence, unresolved:** other endpoints still put bearer-like identifiers into URL paths that application middleware logs. Anyone obtaining an identifier can replay it; localStorage and missing expiry/revocation remain unchanged. The lookup endpoint's rejection of unknown IDs does not change get-or-create behavior on other routes. These remain before-public-exposure work.
+- **SEC-04, design concern, Low severity/high confidence, unresolved:** automatic HTTP retries can repeat new-session creation after a lost response, and the user service commits user/profile separately. Same-module concurrent initialization is deduplicated, but cross-tab/server idempotency and atomic creation remain separate remediation.
+- No schema migration, account framework, credential change, dependency-policy change or recommendation algorithm change. Profile responses preserve score maps and omit embeddings.
+
+The reviewer independently ran 23 backend contract cases and the then-current 11 frontend wrapper cases successfully; the final ledger includes an additional interceptor log-redaction test. Deployed logs/proxies, HTTPS, browser behavior and cross-tab races were not verified. See [verification](testing.md#core-contract-remediation-app-01--app-02).

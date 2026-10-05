@@ -7,7 +7,6 @@ import tempfile
 import unittest
 import random
 import string
-import ast
 from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1]
@@ -15,27 +14,6 @@ sys.path.insert(0, str(SCRIPTS))
 spec = importlib.util.spec_from_file_location("pre_commit", SCRIPTS / "pre-commit.py")
 gate = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gate)
-
-
-class BackendPartitionTests(unittest.TestCase):
-    def test_partition_runs_exact_regressions_and_preserves_failure_status(self):
-        import check
-        expected = (
-            "backend/tests/test_users_contract.py::test_returning_session_matches_actual_frontend_request",
-            "backend/tests/test_users_contract.py::test_populated_profile_matches_persisted_and_frontend_shape",
-        )
-        self.assertEqual(check.KNOWN_APPLICATION_DEFECTS, expected)
-        for node in expected:
-            path, name = node.split("::")
-            definitions = ast.parse((check.ROOT / path).read_text()).body
-            self.assertTrue(any(isinstance(item, ast.FunctionDef) and item.name == name for item in definitions))
-        with patch.object(check, "run", return_value=1) as run:
-            self.assertEqual(check.check("known-application-defects"), 1)
-            self.assertEqual(run.call_args.args[0][5:], list(expected))
-            self.assertEqual(check.check("backend-foundation"), 1)
-            self.assertEqual(run.call_args.args[0][5:], ["backend/tests", *[f"--deselect={node.removeprefix('backend/')}" for node in expected]])
-            self.assertEqual(check.check("backend"), 1)
-            self.assertEqual(run.call_args.args[0][5:], ["backend/tests"])
 
 
 class IndexGateTests(unittest.TestCase):

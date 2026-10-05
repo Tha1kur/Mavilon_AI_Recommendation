@@ -1,6 +1,6 @@
 # Development plan and improvement backlog
 
-Private development toward a later public launch. The owner approved foundation preparation only; application behavior changes, deployment and hosted GitHub settings remain outside this phase. Preserve existing useful configuration and versions. This plan extends the 2026-09-29 backlog rather than replacing its unverified work with a completion claim.
+Private development toward a later public launch. Foundation is merged; the owner authorized APP-01/APP-02 as the first application-remediation phase. Other behavior changes, deployment and hosted GitHub settings remain outside this change. Preserve existing useful configuration and versions. This plan extends the 2026-09-29 backlog rather than replacing its unverified work with a completion claim.
 
 ## Foundation sequence
 
@@ -12,29 +12,34 @@ Private development toward a later public launch. The owner approved foundation 
 | D | Canonical checks and focused deterministic backend tests | Complete: canonical checks; 15 tests pass and 2 expose existing defects |
 | E | Fast native hook, pinned Gitleaks, npm/pip audits and repository-side GitHub Actions | Hosted deterministic checks pass; audits and known defects report existing debt; see testing evidence |
 | F | Run applicable checks, test safeguard failure modes, distinguish existing failures/security findings from foundation regressions | Complete with documented failures/blockers; see testing evidence |
-| G | Review complete diff for behavior preservation, useful docs, private/generated files and unresolved blockers | Complete: source/config preservation, dependency graph, audit hashes, docs links and safeguards reviewed; awaiting separate remediation approval |
+| G | Review complete diff for behavior preservation, useful docs, private/generated files and unresolved blockers | Complete: source/config preservation, dependency graph, audit hashes, docs links and safeguards reviewed; APP-01/APP-02 subsequently authorized below |
 
 [README](README.md) owns commands; [testing](docs/testing.md) owns executed verification evidence. No daily automation or deployment is implied. Foundation readiness and release readiness are separate.
 
-## Next remediation change: contracts and truthful state
+## First remediation change: APP-01 / APP-02
 
-Define identity/history requirements before their affected implementation. These source findings remain intentionally untouched in the foundation phase:
+The core contracts below are resolved. Broader identity/history decisions and the other listed defects remain deferred:
 
-- **APP-01 — Session contract:** [client](lib/api/user.ts) sends an existing ID in JSON; [backend](backend/routers/users.py) expects a query parameter. Verify that returning sessions do not create orphan users and continue to resolve their data.
-- **APP-02 — Taste contract:** [backend response](backend/routers/users.py) declares string lists, while [service persistence](backend/services/user_service.py) and [profile UI](app/profile/page.tsx) use score dictionaries. Verify a populated profile and explicit failure state.
+- **APP-01 — Resolved:** JSON-only session lookup returns persisted identity and reuses the existing user. Unknown/invalid IDs fail explicitly; frontend storage follows server confirmation and survives transient errors. Original regression preserved; see [contract decisions](docs/requirements.md#app-01--app-02-contract-decisions).
+- **APP-02 — Resolved:** response and frontend share numeric score maps, preserving fractional genre/mood scores and valid empty profiles. Legacy lists use the existing service conversion convention. Failed loads remain errors with a retry message; original regression preserved.
 - **Failed mutations:** [card favorites](components/ui/ContentCard.tsx) repeat the optimistic value on failure; [profile deletions](app/profile/page.tsx) lack rollback/visible failure. Test add/remove, refresh and rejected writes.
 - **History semantics:** [interaction service](backend/services/user_service.py) writes `interactions`; [history routes](backend/routers/history.py) read `watch_history`. Decide what history means before wiring it. Verify deletion/recalculation and retries against that decision.
 - **Incomplete anime taste:** the [user service](backend/services/user_service.py) anime lookup branch is unfinished. Define parity/support expectations and verify them.
 - **Fallback and similarity:** [movies router](backend/routers/movies.py) calls absent `get_popular_movies`; [similar route](backend/routers/content.py) passes a dictionary into model-oriented scoring and masks errors as empty results. Exercise failure paths with deterministic provider fixtures.
 - **Mutation/concurrency contracts:** [retry interceptor](lib/api/client.ts) can replay mutations; user creation and multi-step writes require idempotency/transaction review. Preserve ownership and uniqueness under retries and concurrency.
 
-### Remove the temporary CI exception with APP-01 / APP-02
+### Remediation execution status
 
-The owner approved a foundation-only CI exception for exactly the two existing regressions. `Known application defects` runs them on every workflow event independently of the blocking jobs, with execution-step `continue-on-error: true`, normal failure output and a summary of the original step outcome. Setup failures remain failures. This is not a release waiver. All deterministic foundation checks remain blocking; dependency audits have their separate DEP-01 exception below.
+| Step | Status |
+| --- | --- |
+| Reproduce unchanged APP-01/APP-02 regressions | Complete: both failed before edits |
+| Trace and define canonical session/profile contracts | Complete: [requirements](docs/requirements.md#app-01--app-02-contract-decisions), no algorithm/schema redesign |
+| Implement fixes and important contract coverage | Complete: original regressions pass unchanged; additional request/storage/serialization tests |
+| Restore full blocking backend CI | Complete: `backend` runs every test; temporary known-defects job, partition commands/constant and guard removed |
+| Independent read-only session security review and complete verification | Complete: no introduced security blocker; 37 backend tests, 12 frontend contract tests, lint/type/build, 9 safeguard tests and Gitleaks pass; see [testing](docs/testing.md) |
+| Commit/push | Remediation checkpoint approved; commit/PR authorized, no merge. Hosted CI and scoped BrowserAct QA follow. |
 
-The next remediation PR must fix APP-01/APP-02 without weakening these tests, demonstrate both pass, switch the blocking backend job from `backend-foundation` back to `backend`, and remove the temporary job plus `KNOWN_APPLICATION_DEFECTS`/partition commands and their guard test. If fixes land separately, return each fixed test to blocking coverage in that same PR; do not leave a fixed test under the exception. Default local `backend`/`all` already include both tests. Document the removal and rerun the complete blocking suite. The exception cannot expand to additional tests without explicit approval.
-
-Split this scope into reviewable changes if fixing all contracts together obscures behavior review. The session/profile regressions already fail in the foundation suite. Extend regression tests with each approved fix; do not change expectations solely to achieve green checks.
+The foundation-only APP-01/APP-02 CI exception is removed. Dependency-advisory exceptions below are unchanged. Other application defects must receive separate scoped remediation; they are not covered by the retired two-test exception.
 
 ## DEP-01 — Dependency remediation and removal of advisory exceptions
 

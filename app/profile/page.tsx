@@ -13,25 +13,22 @@ import {
 } from '@/lib/api/user';
 import { getContentDetails } from '@/lib/api/endpoints';
 import { Content } from '@/types/content';
+import { TasteProfile } from '@/types/user';
 import ContentCard from '@/components/ui/ContentCard';
-
-interface ProfileData {
-    interaction_count: number;
-    favorite_genres?: Record<string, number>;
-    favorite_moods?: Record<string, number>;
-}
 
 export default function ProfilePage() {
     const [activeTab, setActiveTab] = useState<'taste' | 'favorites' | 'history'>('taste');
 
-    const [profile, setProfile] = useState<ProfileData | null>(null);
+    const [profile, setProfile] = useState<TasteProfile | null>(null);
     const [favorites, setFavorites] = useState<{ id: string, type: 'movie' | 'anime', content?: Content }[]>([]);
     const [history, setHistory] = useState<{ id: string, type: 'movie' | 'anime', watched_at: string, content?: Content }[]>([]);
 
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
 
     const loadData = async () => {
         setLoading(true);
+        setLoadError(false);
         try {
             // Fetch baseline data
             const [profileData, favData, histData] = await Promise.all([
@@ -68,7 +65,7 @@ export default function ProfilePage() {
             enrichItems(histItems).then(setHistory);
 
         } catch (error) {
-            console.error("Failed to load profile data:", error);
+            setLoadError(true);
         } finally {
             setLoading(false);
         }
@@ -104,6 +101,14 @@ export default function ProfilePage() {
     return (
         <main className="min-h-screen py-24 px-6">
             <div className="max-w-7xl mx-auto">
+                {loadError && (
+                    <div role="alert" className="mb-6 rounded-lg bg-white/5 p-4 text-gray-200">
+                        Unable to load your profile. Please try again.
+                        <button type="button" onClick={loadData} className="ml-4 underline" disabled={loading}>
+                            Retry
+                        </button>
+                    </div>
+                )}
                 {/* Header */}
                 <div className="flex items-center gap-4 mb-12">
                     <Link href="/" className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors mr-4">
