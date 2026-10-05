@@ -29,3 +29,7 @@ build/
 .vscode/
 next-env.d.ts
 /private/
+
+# Local verified tooling and model/download caches
+.tools/
+.hf-cache/
